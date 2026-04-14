@@ -10,7 +10,6 @@ import {
   Calculator, 
   Users, 
   Truck, 
-  PlayCircle, 
   Settings,
   Loader2,
   LogOut
@@ -38,7 +37,6 @@ import { RecipesPage } from '@/pages/Recipes';
 import { CalculationsPage } from '@/pages/Calculations';
 import { ClientsPage } from '@/pages/Clients';
 import { SuppliersPage } from '@/pages/Suppliers';
-import { TutorialsPage } from '@/pages/Tutorials';
 import { SettingsPage } from '@/pages/Settings';
 import { LoginPage } from '@/pages/Login';
 
@@ -53,7 +51,6 @@ type View =
   | 'Calc.' 
   | 'Clientes' 
   | 'Fornec.' 
-  | 'Tutoriais' 
   | 'Ajustes';
 
 const menuItems = [
@@ -67,7 +64,6 @@ const menuItems = [
   { name: 'Calc.', icon: Calculator },
   { name: 'Clientes', icon: Users },
   { name: 'Fornec.', icon: Truck },
-  { name: 'Tutoriais', icon: PlayCircle },
   { name: 'Ajustes', icon: Settings },
 ];
 
@@ -189,7 +185,6 @@ export default function App() {
                 {currentView === 'Calc.' && <CalculationsPage calculations={calculations} refresh={refresh} />}
                 {currentView === 'Clientes' && <ClientsPage clients={clients} refresh={refresh} />}
                 {currentView === 'Fornec.' && <SuppliersPage suppliers={suppliers} refresh={refresh} />}
-                {currentView === 'Tutoriais' && <TutorialsPage />}
                 {currentView === 'Ajustes' && <SettingsPage userProfile={userProfile} setUserProfile={setUserProfile} />}
               </motion.div>
             </AnimatePresence>

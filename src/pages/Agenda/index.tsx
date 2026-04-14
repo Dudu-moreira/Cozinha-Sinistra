@@ -3,8 +3,9 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-import { Calendar } from 'lucide-react';
+import { Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Order } from '@/types';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface AgendaProps {
   orders: Order[];
@@ -13,20 +14,104 @@ interface AgendaProps {
 export const AgendaPage = ({ orders }: AgendaProps) => {
   const [viewType, setViewType] = useState<'dia' | 'semana' | 'mes'>('mes');
   const today = new Date();
-  const currentMonth = today.getMonth();
-  const currentYear = today.getFullYear();
   
-  const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
-  const firstDayOfMonth = new Date(currentYear, currentMonth, 1).getDay();
-  const monthName = today.toLocaleDateString('pt-BR', { month: 'long' });
+  const [selectedMonth, setSelectedMonth] = useState(today.getMonth());
+  const [selectedYear, setSelectedYear] = useState(today.getFullYear());
+
+  const daysInMonth = new Date(selectedYear, selectedMonth + 1, 0).getDate();
+  const firstDayOfMonth = new Date(selectedYear, selectedMonth, 1).getDay();
+  
+  const monthNames = [
+    'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+    'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
+  ];
+
+  const years = Array.from({ length: 5 }, (_, i) => today.getFullYear() - 2 + i);
+
+  const handlePrevMonth = () => {
+    if (selectedMonth === 0) {
+      setSelectedMonth(11);
+      setSelectedYear(prev => prev - 1);
+    } else {
+      setSelectedMonth(prev => prev - 1);
+    }
+  };
+
+  const handleNextMonth = () => {
+    if (selectedMonth === 11) {
+      setSelectedMonth(0);
+      setSelectedYear(prev => prev + 1);
+    } else {
+      setSelectedMonth(prev => prev + 1);
+    }
+  };
+
+  const handleToday = () => {
+    setSelectedMonth(today.getMonth());
+    setSelectedYear(today.getFullYear());
+  };
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <h2 className="text-2xl font-bold text-slate-900 hidden sm:block">Agenda de Entregas</h2>
+        <div className="flex items-center gap-4">
+          <h2 className="text-2xl font-bold text-slate-900 hidden sm:block">Agenda de Entregas</h2>
+          
+          <div className="flex items-center gap-2 bg-white p-1 rounded-lg border border-slate-200 shadow-sm">
+            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handlePrevMonth}>
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            
+            <Select 
+              value={selectedMonth.toString()} 
+              onValueChange={(v) => setSelectedMonth(parseInt(v))}
+            >
+              <SelectTrigger className="h-8 w-[130px] border-none shadow-none font-bold text-slate-700">
+                <SelectValue>
+                  {monthNames[selectedMonth]}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {monthNames.map((name, i) => (
+                  <SelectItem key={i} value={i.toString()}>{name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select 
+              value={selectedYear.toString()} 
+              onValueChange={(v) => setSelectedYear(parseInt(v))}
+            >
+              <SelectTrigger className="h-8 w-[80px] border-none shadow-none font-bold text-slate-700">
+                <SelectValue placeholder="Ano" />
+              </SelectTrigger>
+              <SelectContent>
+                {years.map(year => (
+                  <SelectItem key={year} value={year.toString()}>{year}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleNextMonth}>
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+            
+            <div className="w-px h-4 bg-slate-200 mx-1" />
+            
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="h-8 px-3 text-xs font-bold text-primary hover:bg-orange-50"
+              onClick={handleToday}
+            >
+              Hoje
+            </Button>
+          </div>
+        </div>
+
         <div className="flex items-center justify-between sm:justify-end gap-2 w-full sm:w-auto">
           <div className="text-sm font-bold text-primary capitalize sm:hidden">
-            {viewType === 'dia' ? 'Hoje' : viewType === 'semana' ? 'Esta Semana' : monthName}
+            {viewType === 'dia' ? 'Hoje' : viewType === 'semana' ? 'Esta Semana' : monthNames[selectedMonth]}
           </div>
           <div className="flex gap-1 bg-slate-100 p-1 rounded-lg">
             <Button 
@@ -82,10 +167,10 @@ export const AgendaPage = ({ orders }: AgendaProps) => {
                   ))}
                   {Array.from({ length: daysInMonth }).map((_, i) => {
                     const dayNumber = i + 1;
-                    const isToday = dayNumber === today.getDate() && currentMonth === today.getMonth();
+                    const isToday = dayNumber === today.getDate() && selectedMonth === today.getMonth() && selectedYear === today.getFullYear();
                     const dayOrders = orders.filter(o => {
                       const d = new Date(o.deliveryDate);
-                      return d.getDate() === dayNumber && d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+                      return d.getDate() === dayNumber && d.getMonth() === selectedMonth && d.getFullYear() === selectedYear;
                     });
                     
                     return (
@@ -117,12 +202,19 @@ export const AgendaPage = ({ orders }: AgendaProps) => {
             {viewType === 'semana' && (
               <div className="divide-y divide-slate-100">
                 {Array.from({ length: 7 }).map((_, i) => {
-                  const date = new Date();
-                  date.setDate(today.getDate() - today.getDay() + i);
-                  const isToday = date.getDate() === today.getDate() && date.getMonth() === today.getMonth();
+                  const date = new Date(selectedYear, selectedMonth, today.getDate());
+                  // Adjust to start of week based on selected month/year
+                  // If it's the current month, we use today's relative week
+                  // If it's a different month, we show the first week of that month
+                  const baseDate = (selectedMonth === today.getMonth() && selectedYear === today.getFullYear()) 
+                    ? today 
+                    : new Date(selectedYear, selectedMonth, 1);
+                  
+                  date.setDate(baseDate.getDate() - baseDate.getDay() + i);
+                  const isToday = date.getDate() === today.getDate() && date.getMonth() === today.getMonth() && date.getFullYear() === today.getFullYear();
                   const dayOrders = orders.filter(o => {
                     const d = new Date(o.deliveryDate);
-                    return d.getDate() === date.getDate() && d.getMonth() === date.getMonth();
+                    return d.getDate() === date.getDate() && d.getMonth() === date.getMonth() && d.getFullYear() === date.getFullYear();
                   });
                   
                   return (
@@ -163,8 +255,12 @@ export const AgendaPage = ({ orders }: AgendaProps) => {
               <div className="p-4 sm:p-6">
                 <div className="flex items-center justify-between mb-6">
                   <div>
-                    <h3 className="font-black text-slate-900 text-lg">Programação de Hoje</h3>
-                    <p className="text-xs text-slate-500">{today.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}</p>
+                    <h3 className="font-black text-slate-900 text-lg">Programação</h3>
+                    <p className="text-xs text-slate-500">
+                      {(selectedMonth === today.getMonth() && selectedYear === today.getFullYear()) 
+                        ? today.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })
+                        : new Date(selectedYear, selectedMonth, 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}
+                    </p>
                   </div>
                 </div>
                 <div className="space-y-1">
@@ -172,8 +268,12 @@ export const AgendaPage = ({ orders }: AgendaProps) => {
                     const hour = i + 7; // 7:00 to 21:00
                     const hourOrders = orders.filter(o => {
                       const d = new Date(o.deliveryDate);
-                      return d.getDate() === today.getDate() && 
-                             d.getMonth() === today.getMonth() && 
+                      const targetDate = (selectedMonth === today.getMonth() && selectedYear === today.getFullYear())
+                        ? today.getDate()
+                        : 1;
+                      return d.getDate() === targetDate && 
+                             d.getMonth() === selectedMonth && 
+                             d.getFullYear() === selectedYear &&
                              d.getHours() === hour;
                     });
                     
@@ -228,7 +328,9 @@ export const AgendaPage = ({ orders }: AgendaProps) => {
                     <p className="text-xs font-black text-slate-900 truncate">{order.product}</p>
                     <div className="flex items-center justify-between mt-1">
                       <p className="text-[10px] text-slate-500">{order.clientName}</p>
-                      <span className="text-[10px] font-bold text-primary">{new Date(order.deliveryDate).getDate()}/{new Date(order.deliveryDate).getMonth() + 1}</span>
+                      <span className="text-[10px] font-bold text-primary">
+                        {new Date(order.deliveryDate).getDate()} {monthNames[new Date(order.deliveryDate).getMonth()].substring(0, 3)}
+                      </span>
                     </div>
                   </div>
                 </div>
