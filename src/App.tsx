@@ -1011,12 +1011,12 @@ function OrdersView({ orders }: { orders: Order[] }) {
           setIsModalOpen(open);
           if (!open) setEditingOrder(null);
         }}>
-          <DialogTrigger asChild>
+          <DialogTrigger render={
             <Button className="bg-primary hover:bg-primary/90 gap-2">
               <Plus size={18} />
               Novo Pedido
             </Button>
-          </DialogTrigger>
+          } />
           <DialogContent className="sm:max-w-[425px]">
             <DialogHeader>
               <DialogTitle>{editingOrder ? 'Editar Pedido' : 'Novo Pedido'}</DialogTitle>
@@ -1361,12 +1361,12 @@ function ProductionView({ tasks, columns }: { tasks: Task[], columns: Production
             setIsColumnModalOpen(open);
             if (!open) setEditingColumn(null);
           }}>
-            <DialogTrigger asChild>
+            <DialogTrigger render={
               <Button variant="outline" className="gap-2">
                 <Plus size={18} />
                 Nova Coluna
               </Button>
-            </DialogTrigger>
+            } />
             <DialogContent>
               <DialogHeader>
                 <DialogTitle>{editingColumn ? 'Editar Coluna' : 'Nova Coluna'}</DialogTitle>
@@ -1401,12 +1401,12 @@ function ProductionView({ tasks, columns }: { tasks: Task[], columns: Production
             setIsModalOpen(open);
             if (!open) setEditingTask(null);
           }}>
-            <DialogTrigger asChild>
+            <DialogTrigger render={
               <Button className="bg-primary hover:bg-primary/90 gap-2">
                 <Plus size={18} />
                 Nova Tarefa
               </Button>
-            </DialogTrigger>
+            } />
             <DialogContent>
               <DialogHeader>
                 <DialogTitle>{editingTask ? 'Editar Tarefa' : 'Nova Tarefa'}</DialogTitle>
@@ -1489,11 +1489,11 @@ function ProductionView({ tasks, columns }: { tasks: Task[], columns: Production
                     <div className="flex justify-between items-start mb-2">
                       <p className="text-sm font-medium text-slate-900">{task.title}</p>
                       <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
+                        <DropdownMenuTrigger render={
                           <Button variant="ghost" size="icon" className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity">
                             <MoreVertical size={14} />
                           </Button>
-                        </DropdownMenuTrigger>
+                        } />
                         <DropdownMenuContent align="end">
                           <DropdownMenuItem onClick={() => {
                             setEditingTask(task);
@@ -1643,12 +1643,12 @@ function InventoryView({ ingredients }: { ingredients: Ingredient[] }) {
           setIsModalOpen(open);
           if (!open) setEditingItem(null);
         }}>
-          <DialogTrigger asChild>
+          <DialogTrigger render={
             <Button className="bg-primary hover:bg-primary/90 gap-2">
               <Plus size={18} />
               Novo Item
             </Button>
-          </DialogTrigger>
+          } />
           <DialogContent>
             <DialogHeader>
               <DialogTitle>{editingItem ? 'Editar Item' : 'Novo Item'}</DialogTitle>
@@ -1844,12 +1844,12 @@ function FinancesView({ transactions }: { transactions: Transaction[] }) {
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold text-slate-900">Gestão Financeira</h2>
         <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-          <DialogTrigger asChild>
+          <DialogTrigger render={
             <Button className="bg-primary hover:bg-primary/90 gap-2">
               <Plus size={18} />
               Nova Transação
             </Button>
-          </DialogTrigger>
+          } />
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Nova Transação</DialogTitle>
@@ -2081,12 +2081,12 @@ function RecipesView({ recipes }: { recipes: any[] }) {
           setIsModalOpen(open);
           if (!open) setEditingRecipe(null);
         }}>
-          <DialogTrigger asChild>
+          <DialogTrigger render={
             <Button className="bg-primary hover:bg-primary/90 gap-2">
               <Plus size={18} />
               Nova Receita
             </Button>
-          </DialogTrigger>
+          } />
           <DialogContent>
             <DialogHeader>
               <DialogTitle>{editingRecipe ? 'Editar Receita' : 'Nova Receita'}</DialogTitle>
@@ -2747,12 +2747,12 @@ function ClientsView({ clients }: { clients: any[] }) {
           setIsModalOpen(open);
           if (!open) setEditingClient(null);
         }}>
-          <DialogTrigger asChild>
+          <DialogTrigger render={
             <Button className="bg-primary hover:bg-primary/90 gap-2">
               <Plus size={18} />
               Novo Cliente
             </Button>
-          </DialogTrigger>
+          } />
           <DialogContent>
             <DialogHeader>
               <DialogTitle>{editingClient ? 'Editar Cliente' : 'Novo Cliente'}</DialogTitle>
@@ -3215,12 +3215,12 @@ function SuppliersView({ suppliers }: { suppliers: any[] }) {
           setIsModalOpen(open);
           if (!open) setEditingSupplier(null);
         }}>
-          <DialogTrigger asChild>
+          <DialogTrigger render={
             <Button className="bg-primary hover:bg-primary/90 gap-2">
               <Plus size={18} />
               Novo Fornecedor
             </Button>
-          </DialogTrigger>
+          } />
           <DialogContent>
             <DialogHeader>
               <DialogTitle>{editingSupplier ? 'Editar Fornecedor' : 'Novo Fornecedor'}</DialogTitle>

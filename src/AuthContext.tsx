@@ -82,28 +82,38 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const login = async (email: string, pass: string) => {
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password: pass,
-    });
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password: pass,
+      });
 
-    if (error) return { success: false, error: error.message };
-    return { success: true };
+      if (error) return { success: false, error: error.message };
+      return { success: true };
+    } catch (err: any) {
+      console.error("Login error:", err);
+      return { success: false, error: "Erro de conexão. Verifique suas credenciais do Supabase." };
+    }
   };
 
   const signUp = async (email: string, pass: string, name: string) => {
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password: pass,
-      options: {
-        data: {
-          full_name: name,
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password: pass,
+        options: {
+          data: {
+            full_name: name,
+          }
         }
-      }
-    });
+      });
 
-    if (error) return { success: false, error: error.message };
-    return { success: true };
+      if (error) return { success: false, error: error.message };
+      return { success: true };
+    } catch (err: any) {
+      console.error("Signup error:", err);
+      return { success: false, error: "Erro de conexão. Verifique suas credenciais do Supabase." };
+    }
   };
 
   const signInWithGoogle = async () => {
