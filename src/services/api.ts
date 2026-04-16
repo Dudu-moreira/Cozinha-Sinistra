@@ -17,6 +17,7 @@ const withPerformance = async <T>(name: string, fn: () => Promise<T>): Promise<T
 export const mapOrder = (o: any) => ({
   id: o.id,
   clientName: o.client_name,
+  product: o.product || '',
   deliveryDate: o.delivery_date,
   totalValue: o.total_value,
   value: o.total_value,
@@ -117,6 +118,7 @@ export const api = {
     withPerformance('addOrder', async () => {
       const { error } = await supabase.from('orders').insert([{
         client_name: data.clientName,
+        product: data.product,
         delivery_date: data.deliveryDate,
         total_value: data.value,
         status: data.status,
@@ -130,6 +132,7 @@ export const api = {
     withPerformance('updateOrder', async () => {
       const { error } = await supabase.from('orders').update({
         client_name: data.clientName,
+        product: data.product,
         delivery_date: data.deliveryDate,
         total_value: data.value,
         status: data.status,
@@ -453,6 +456,20 @@ export const api = {
   deleteCalculation: (id: string) => 
     withPerformance('deleteCalculation', async () => {
       const { error } = await supabase.from('calculations').delete().eq('id', id);
+      if (error) throw error;
+    }),
+
+  updateProfile: (id: string, data: any) => 
+    withPerformance('updateProfile', async () => {
+      const { error } = await supabase.from('profiles').update({
+        name: data.name,
+        phone: data.phone,
+        company_name: data.companyName,
+        cnpj: data.cnpj,
+        address: data.address,
+        city: data.city,
+        state: data.state
+      }).eq('id', id);
       if (error) throw error;
     }),
 };

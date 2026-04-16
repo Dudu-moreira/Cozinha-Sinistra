@@ -14,7 +14,7 @@ import {
   Loader2,
   LogOut
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from './AuthContext';
 import { useAppData } from '@/hooks/useAppData';
 

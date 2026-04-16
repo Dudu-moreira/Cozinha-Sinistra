@@ -13,9 +13,11 @@ import {
   Trash2,
   Mail,
   Smartphone,
-  Lock
+  Lock,
+  Loader2
 } from 'lucide-react';
 import { useAuth } from '@/AuthContext';
+import { api } from '@/services/api';
 import { cn } from '@/lib/utils';
 
 interface SettingsPageProps {
@@ -26,9 +28,10 @@ interface SettingsPageProps {
 export const SettingsPage = ({ userProfile, setUserProfile }: SettingsPageProps) => {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState('profile');
+  const [isSaving, setIsSaving] = useState(false);
   const [formData, setFormData] = useState({
     name: userProfile?.name || user?.user_metadata?.full_name || '',
-    companyName: userProfile?.companyName || '',
+    companyName: userProfile?.company_name || '',
     email: user?.email || '',
     phone: userProfile?.phone || '',
     cnpj: userProfile?.cnpj || '',
@@ -37,12 +40,23 @@ export const SettingsPage = ({ userProfile, setUserProfile }: SettingsPageProps)
     state: userProfile?.state || ''
   });
 
-  const handleSave = () => {
-    setUserProfile({
-      ...userProfile,
-      ...formData
-    });
-    // In a real app, this would call an API
+  const handleSave = async () => {
+    if (!user) return;
+    setIsSaving(true);
+    try {
+      await api.updateProfile(user.id, formData);
+      setUserProfile({
+        ...userProfile,
+        ...formData,
+        company_name: formData.companyName // Sync the snake_case for the profile state
+      });
+      alert('Configurações salvas com sucesso!');
+    } catch (error) {
+      console.error('Error saving settings:', error);
+      alert('Erro ao salvar configurações.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const menuItems = [
@@ -115,8 +129,12 @@ export const SettingsPage = ({ userProfile, setUserProfile }: SettingsPageProps)
                   </div>
                 </div>
                 <div className="pt-4 flex justify-end">
-                  <Button className="bg-primary hover:bg-primary/90 gap-2" onClick={handleSave}>
-                    <Save size={18} />
+                  <Button 
+                    className="bg-primary hover:bg-primary/90 gap-2" 
+                    onClick={handleSave}
+                    disabled={isSaving}
+                  >
+                    {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save size={18} />}
                     Salvar Alterações
                   </Button>
                 </div>
@@ -192,8 +210,12 @@ export const SettingsPage = ({ userProfile, setUserProfile }: SettingsPageProps)
                   </div>
                 </div>
                 <div className="pt-4 flex justify-end">
-                  <Button className="bg-primary hover:bg-primary/90 gap-2" onClick={handleSave}>
-                    <Save size={18} />
+                  <Button 
+                    className="bg-primary hover:bg-primary/90 gap-2" 
+                    onClick={handleSave}
+                    disabled={isSaving}
+                  >
+                    {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save size={18} />}
                     Salvar Dados
                   </Button>
                 </div>

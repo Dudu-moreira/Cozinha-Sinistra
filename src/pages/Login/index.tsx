@@ -1,5 +1,5 @@
 import React, { useState, FormEvent } from 'react';
-import { motion } from 'motion/react';
+import { motion } from 'framer-motion';
 import { ChefHat, Loader2, Globe } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';

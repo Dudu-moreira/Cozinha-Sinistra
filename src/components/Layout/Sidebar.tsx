@@ -1,5 +1,5 @@
 import React from 'react';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { ChefHat, LogOut, X, LayoutDashboard, Calendar, ShoppingBag, DollarSign, Package, BookOpen, Calculator, Users, Truck, PlayCircle, Settings } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';

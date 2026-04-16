@@ -5,6 +5,7 @@ interface AuthContextType {
   user: any | null;
   loading: boolean;
   userProfile: any | null;
+  setUserProfile: React.Dispatch<React.SetStateAction<any | null>>;
   login: (email: string, pass: string) => Promise<{ success: boolean; error?: string }>;
   signUp: (email: string, pass: string, name: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
@@ -15,6 +16,7 @@ const AuthContext = createContext<AuthContextType>({
   user: null, 
   loading: true, 
   userProfile: null,
+  setUserProfile: () => {},
   login: async () => ({ success: false }),
   signUp: async () => ({ success: false }),
   logout: () => {},
@@ -131,7 +133,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, userProfile, login, signUp, logout, signInWithGoogle }}>
+    <AuthContext.Provider value={{ user, loading, userProfile, setUserProfile, login, signUp, logout, signInWithGoogle }}>
       {children}
     </AuthContext.Provider>
   );
