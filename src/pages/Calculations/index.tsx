@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Plus, Trash2, Calculator, Search, ArrowRight, Save, ChefHat, DollarSign, Package, ArrowLeft } from 'lucide-react';
+import { Plus, Trash2, Calculator, Search, ArrowRight, Save, ChefHat, DollarSign, Package, ArrowLeft, Eye, Copy, Loader2, Edit2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Calculation } from '@/types';
 import { api } from '@/services/api';
@@ -25,9 +25,12 @@ export const CalculationsPage = ({ calculations, refresh }: CalculationsPageProp
   const totalPages = Math.ceil(calculations.length / itemsPerPage);
   const paginatedCalculations = calculations.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
-  const [view, setView] = useState<'list' | 'form'>('list');
+  const [view, setView] = useState<'list' | 'form' | 'detail'>('list');
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [calculationToDelete, setCalculationToDelete] = useState<string | null>(null);
+  const [editingCalculation, setEditingCalculation] = useState<Calculation | null>(null);
+  const [viewingCalculation, setViewingCalculation] = useState<Calculation | null>(null);
   
   const initialFormState = {
     title: '',
@@ -47,6 +50,21 @@ export const CalculationsPage = ({ calculations, refresh }: CalculationsPageProp
   };
 
   const [formData, setFormData] = useState(initialFormState);
+
+  React.useEffect(() => {
+    if (editingCalculation || viewingCalculation) {
+      const target = editingCalculation || viewingCalculation;
+      setFormData({
+        title: target.title,
+        ingredients: target.ingredients,
+        additionalCosts: target.additionalCosts,
+        profitMargin: target.profitMargin.toString(),
+        production: target.production
+      });
+    } else {
+      setFormData(initialFormState);
+    }
+  }, [editingCalculation, viewingCalculation, view]);
 
   // Real-time calculations
   const results = useMemo(() => {
@@ -109,6 +127,7 @@ export const CalculationsPage = ({ calculations, refresh }: CalculationsPageProp
     e.preventDefault();
     if (!user) return;
 
+    setIsSaving(true);
     const data = {
       ...formData,
       totalValue: results.totalValue,
@@ -117,12 +136,44 @@ export const CalculationsPage = ({ calculations, refresh }: CalculationsPageProp
     };
 
     try {
-      await api.addCalculation(data);
+      if (editingCalculation) {
+        await api.updateCalculation(editingCalculation.id, data);
+      } else {
+        await api.addCalculation(data);
+      }
       setView('list');
+      setEditingCalculation(null);
+      setViewingCalculation(null);
       setFormData(initialFormState);
       refresh();
+      alert(editingCalculation ? 'Cálculo atualizado!' : 'Cálculo salvo com sucesso!');
     } catch (err) {
       console.error("Error saving calculation:", err);
+      alert("Erro ao salvar cálculo.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleDuplicate = async (calc: Calculation) => {
+    if (!user) return;
+    try {
+      const data = {
+        ...calc,
+        title: `${calc.title} (Cópia)`,
+        userId: user.id
+      };
+      // Remove id and timestamps if they exist in the object
+      delete (data as any).id;
+      delete (data as any).createdAt;
+      delete (data as any).updatedAt;
+      
+      await api.addCalculation(data);
+      refresh();
+      alert('Cálculo duplicado com sucesso!');
+    } catch (err) {
+      console.error("Error duplicating calculation:", err);
+      alert("Erro ao duplicar cálculo.");
     }
   };
 
@@ -142,16 +193,21 @@ export const CalculationsPage = ({ calculations, refresh }: CalculationsPageProp
     return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
   };
 
-  if (view === 'form') {
+  if (view === 'form' || view === 'detail') {
+    const isDetail = view === 'detail';
     return (
       <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => setView('list')} className="rounded-full">
+          <Button variant="ghost" size="icon" onClick={() => { setView('list'); setEditingCalculation(null); setViewingCalculation(null); }} className="rounded-full">
             <ArrowLeft size={20} />
           </Button>
           <div>
-            <h2 className="text-2xl font-bold text-slate-900">Novo Cálculo de Custo</h2>
-            <p className="text-slate-500 text-sm">Preencha os dados abaixo para calcular o custo da sua produção.</p>
+            <h2 className="text-2xl font-bold text-slate-900">
+              {isDetail ? 'Detalhes do Cálculo' : (editingCalculation ? 'Editar Cálculo' : 'Novo Cálculo de Custo')}
+            </h2>
+            <p className="text-slate-500 text-sm">
+              {isDetail ? 'Visualize as informações do cálculo.' : 'Preencha os dados abaixo para calcular o custo da sua produção.'}
+            </p>
           </div>
         </div>
 
@@ -166,6 +222,7 @@ export const CalculationsPage = ({ calculations, refresh }: CalculationsPageProp
                   onChange={(e) => setFormData({...formData, title: e.target.value})}
                   placeholder="Ex: Bolo de Brigadeiro Gourmet"
                   required
+                  disabled={isDetail}
                   className="text-lg font-bold h-12"
                 />
               </div>
@@ -177,9 +234,11 @@ export const CalculationsPage = ({ calculations, refresh }: CalculationsPageProp
                     <ChefHat size={18} className="text-primary" />
                     1. Ingredientes
                   </Label>
-                  <Button type="button" variant="outline" size="sm" onClick={addIngredient} className="gap-2">
-                    <Plus size={14} /> Adicionar
-                  </Button>
+                  {!isDetail && (
+                    <Button type="button" variant="outline" size="sm" onClick={addIngredient} className="gap-2">
+                      <Plus size={14} /> Adicionar
+                    </Button>
+                  )}
                 </div>
                 
                 <div className="space-y-3">
@@ -192,6 +251,7 @@ export const CalculationsPage = ({ calculations, refresh }: CalculationsPageProp
                           value={ing.name || ''} 
                           onChange={(e) => updateIngredient(ing.id, 'name', e.target.value)}
                           required
+                          disabled={isDetail}
                         />
                       </div>
                       <div className="sm:col-span-2 space-y-1">
@@ -203,6 +263,7 @@ export const CalculationsPage = ({ calculations, refresh }: CalculationsPageProp
                           value={ing.price || ''} 
                           onChange={(e) => updateIngredient(ing.id, 'price', e.target.value)}
                           required
+                          disabled={isDetail}
                         />
                       </div>
                       <div className="sm:col-span-2 space-y-1">
@@ -214,6 +275,7 @@ export const CalculationsPage = ({ calculations, refresh }: CalculationsPageProp
                           value={ing.totalQty || ''} 
                           onChange={(e) => updateIngredient(ing.id, 'totalQty', e.target.value)}
                           required
+                          disabled={isDetail}
                         />
                       </div>
                       <div className="sm:col-span-2 space-y-1">
@@ -225,6 +287,7 @@ export const CalculationsPage = ({ calculations, refresh }: CalculationsPageProp
                           value={ing.usedQty || ''} 
                           onChange={(e) => updateIngredient(ing.id, 'usedQty', e.target.value)}
                           required
+                          disabled={isDetail}
                         />
                       </div>
                       <div className="sm:col-span-2 space-y-1">
@@ -233,7 +296,7 @@ export const CalculationsPage = ({ calculations, refresh }: CalculationsPageProp
                           {formatCurrency((parseFloat(ing.price) / (parseFloat(ing.totalQty) || 1)) * (parseFloat(ing.usedQty) || 0))}
                         </div>
                       </div>
-                      {formData.ingredients.length > 1 && (
+                      {!isDetail && formData.ingredients.length > 1 && (
                         <Button 
                           type="button" 
                           variant="ghost" 
@@ -265,6 +328,7 @@ export const CalculationsPage = ({ calculations, refresh }: CalculationsPageProp
                         value={formData.additionalCosts.expenses || ''} 
                         onChange={(e) => setFormData({...formData, additionalCosts: {...formData.additionalCosts, expenses: e.target.value}})}
                         placeholder="0.00"
+                        disabled={isDetail}
                       />
                     </div>
                     <div className="space-y-1">
@@ -275,6 +339,7 @@ export const CalculationsPage = ({ calculations, refresh }: CalculationsPageProp
                         value={formData.additionalCosts.labor || ''} 
                         onChange={(e) => setFormData({...formData, additionalCosts: {...formData.additionalCosts, labor: e.target.value}})}
                         placeholder="0.00"
+                        disabled={isDetail}
                       />
                     </div>
                     <div className="space-y-1">
@@ -285,6 +350,7 @@ export const CalculationsPage = ({ calculations, refresh }: CalculationsPageProp
                         value={formData.additionalCosts.filling || ''} 
                         onChange={(e) => setFormData({...formData, additionalCosts: {...formData.additionalCosts, filling: e.target.value}})}
                         placeholder="0.00"
+                        disabled={isDetail}
                       />
                     </div>
                   </div>
@@ -304,6 +370,7 @@ export const CalculationsPage = ({ calculations, refresh }: CalculationsPageProp
                         onChange={(e) => setFormData({...formData, production: {...formData.production, yield: e.target.value}})}
                         placeholder="1"
                         required
+                        disabled={isDetail}
                       />
                     </div>
                     <div className="space-y-1">
@@ -312,6 +379,7 @@ export const CalculationsPage = ({ calculations, refresh }: CalculationsPageProp
                         placeholder="Ex: 100g"
                         value={formData.production.weight || ''} 
                         onChange={(e) => setFormData({...formData, production: {...formData.production, weight: e.target.value}})}
+                        disabled={isDetail}
                       />
                     </div>
                     <div className="space-y-1">
@@ -322,6 +390,7 @@ export const CalculationsPage = ({ calculations, refresh }: CalculationsPageProp
                         onChange={(e) => setFormData({...formData, profitMargin: e.target.value})}
                         placeholder="30"
                         required
+                        disabled={isDetail}
                       />
                     </div>
                   </div>
@@ -352,13 +421,18 @@ export const CalculationsPage = ({ calculations, refresh }: CalculationsPageProp
               </div>
 
               <div className="flex gap-4 pt-4">
-                <Button type="button" variant="outline" onClick={() => setView('list')} className="flex-1 h-12 font-bold">
-                  Cancelar
+                <Button type="button" variant="outline" onClick={() => { setView('list'); setEditingCalculation(null); setViewingCalculation(null); }} className="flex-1 h-12 font-bold">
+                  {isDetail ? 'Voltar' : 'Cancelar'}
                 </Button>
-                <Button type="submit" className="flex-[2] bg-primary hover:bg-primary/90 gap-2 h-12 text-base font-bold shadow-lg shadow-primary/20">
-                  <Save size={20} />
-                  Salvar Cálculo
-                </Button>
+                {!isDetail && (
+                  <Button 
+                    type="submit" 
+                    disabled={isSaving}
+                    className="flex-[2] bg-primary hover:bg-primary/90 gap-2 h-12 text-base font-bold shadow-lg shadow-primary/20"
+                  >
+                    {isSaving ? <Loader2 className="w-5 h-5 animate-spin" /> : (editingCalculation ? <><Save size={20} /> Salvar Alterações</> : <><Save size={20} /> Salvar Cálculo</>)}
+                  </Button>
+                )}
               </div>
             </form>
           </CardContent>
@@ -408,18 +482,35 @@ export const CalculationsPage = ({ calculations, refresh }: CalculationsPageProp
                       <p className="text-xs text-slate-400">{new Date(calc.createdAt).toLocaleDateString()}</p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-4">
-                    <div className="text-right mr-4">
-                      <p className="text-[10px] uppercase text-slate-400 font-bold">Venda Sugerida</p>
-                      <p className="text-sm font-black text-emerald-600">{formatCurrency(calc.totalValue)}</p>
+                    <div className="flex items-center gap-2">
+                      <div className="text-right mr-4">
+                        <p className="text-[10px] uppercase text-slate-400 font-bold">Venda Sugerida</p>
+                        <p className="text-sm font-black text-emerald-600">{formatCurrency(calc.totalValue)}</p>
+                      </div>
+                      <div className="flex gap-1">
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-300" title="Visualizar" onClick={() => {
+                          setViewingCalculation(calc);
+                          setView('detail');
+                        }}>
+                          <Eye size={14} />
+                        </Button>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-300" title="Editar" onClick={() => {
+                          setEditingCalculation(calc);
+                          setView('form');
+                        }}>
+                          <Edit2 size={14} />
+                        </Button>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-300" title="Duplicar" onClick={() => handleDuplicate(calc)}>
+                          <Copy size={14} />
+                        </Button>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-300 hover:text-red-600 transition-opacity" title="Excluir" onClick={() => {
+                          setCalculationToDelete(calc.id);
+                          setIsDeleteDialogOpen(true);
+                        }}>
+                          <Trash2 size={14} />
+                        </Button>
+                      </div>
                     </div>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-300 hover:text-red-600 transition-opacity" onClick={() => {
-                      setCalculationToDelete(calc.id);
-                      setIsDeleteDialogOpen(true);
-                    }}>
-                      <Trash2 size={14} />
-                    </Button>
-                  </div>
                 </div>
               ))}
               {calculations.length === 0 && (

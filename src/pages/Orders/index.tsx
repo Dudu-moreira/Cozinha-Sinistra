@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Trash2, Edit2, Search, ArrowLeft, Loader2 } from 'lucide-react';
+import { Plus, Trash2, Edit2, Search, ArrowLeft, Loader2, Eye, Copy } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Order, OrderStatus } from '@/types';
 import { api } from '@/services/api';
@@ -23,10 +23,11 @@ export const OrdersPage = ({ orders, refresh }: OrdersPageProps) => {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
   
-  const [view, setView] = useState<'list' | 'form'>('list');
+  const [view, setView] = useState<'list' | 'form' | 'detail'>('list');
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [editingOrder, setEditingOrder] = useState<Order | null>(null);
+  const [viewingOrder, setViewingOrder] = useState<Order | null>(null);
   const [orderToDelete, setOrderToDelete] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     clientName: '',
@@ -37,13 +38,14 @@ export const OrdersPage = ({ orders, refresh }: OrdersPageProps) => {
   });
 
   useEffect(() => {
-    if (editingOrder) {
+    if (editingOrder || viewingOrder) {
+      const target = editingOrder || viewingOrder;
       setFormData({
-        clientName: editingOrder.clientName,
-        product: editingOrder.product,
-        deliveryDate: editingOrder.deliveryDate.split('T')[0],
-        value: editingOrder.value.toString(),
-        status: editingOrder.status
+        clientName: target!.clientName,
+        product: target!.product,
+        deliveryDate: target!.deliveryDate.split('T')[0],
+        value: target!.value.toString(),
+        status: target!.status
       });
     } else {
       setFormData({
@@ -54,7 +56,7 @@ export const OrdersPage = ({ orders, refresh }: OrdersPageProps) => {
         status: 'Pendente'
       });
     }
-  }, [editingOrder, view]);
+  }, [editingOrder, viewingOrder, view]);
 
   const totalPages = Math.ceil(orders.length / itemsPerPage);
   const paginatedOrders = orders.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
@@ -106,16 +108,41 @@ export const OrdersPage = ({ orders, refresh }: OrdersPageProps) => {
     }
   };
 
-  if (view === 'form') {
+  const handleDuplicate = async (order: Order) => {
+    if (!user) return;
+    try {
+      const data = {
+        clientName: `${order.clientName} (Cópia)`,
+        product: order.product,
+        deliveryDate: order.deliveryDate.split('T')[0],
+        value: order.value,
+        status: 'Pendente' as OrderStatus,
+        userId: user.id
+      };
+      await api.addOrder(data);
+      refresh();
+      alert('Pedido duplicado com sucesso!');
+    } catch (err) {
+      console.error("Error duplicating order:", err);
+      alert("Erro ao duplicar pedido.");
+    }
+  };
+
+  if (view === 'form' || view === 'detail') {
+    const isDetail = view === 'detail';
     return (
       <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => { setView('list'); setEditingOrder(null); }} className="rounded-full">
+          <Button variant="ghost" size="icon" onClick={() => { setView('list'); setEditingOrder(null); setViewingOrder(null); }} className="rounded-full">
             <ArrowLeft size={20} />
           </Button>
           <div>
-            <h2 className="text-2xl font-bold text-slate-900">{editingOrder ? 'Editar Pedido' : 'Novo Pedido'}</h2>
-            <p className="text-slate-500 text-sm">Preencha os detalhes da encomenda abaixo.</p>
+            <h2 className="text-2xl font-bold text-slate-900">
+              {isDetail ? 'Detalhes do Pedido' : (editingOrder ? 'Editar Pedido' : 'Novo Pedido')}
+            </h2>
+            <p className="text-slate-500 text-sm">
+              {isDetail ? 'Visualize as informações da encomenda.' : 'Preencha os detalhes da encomenda abaixo.'}
+            </p>
           </div>
         </div>
 
@@ -130,6 +157,7 @@ export const OrdersPage = ({ orders, refresh }: OrdersPageProps) => {
                   onChange={(e) => setFormData({...formData, clientName: e.target.value})}
                   placeholder="Nome do cliente"
                   required
+                  disabled={isDetail}
                   className="h-12"
                 />
               </div>
@@ -141,6 +169,7 @@ export const OrdersPage = ({ orders, refresh }: OrdersPageProps) => {
                   onChange={(e) => setFormData({...formData, product: e.target.value})}
                   placeholder="Ex: Bolo de Chocolate"
                   required
+                  disabled={isDetail}
                   className="h-12"
                 />
               </div>
@@ -153,6 +182,7 @@ export const OrdersPage = ({ orders, refresh }: OrdersPageProps) => {
                     value={formData.deliveryDate || ''} 
                     onChange={(e) => setFormData({...formData, deliveryDate: e.target.value})}
                     required
+                    disabled={isDetail}
                     className="h-12"
                   />
                 </div>
@@ -166,6 +196,7 @@ export const OrdersPage = ({ orders, refresh }: OrdersPageProps) => {
                     onChange={(e) => setFormData({...formData, value: e.target.value})}
                     placeholder="0,00"
                     required
+                    disabled={isDetail}
                     className="h-12"
                   />
                 </div>
@@ -175,6 +206,7 @@ export const OrdersPage = ({ orders, refresh }: OrdersPageProps) => {
                 <Select 
                   value={formData.status || ''} 
                   onValueChange={(value: OrderStatus) => setFormData({...formData, status: value})}
+                  disabled={isDetail}
                 >
                   <SelectTrigger className="h-12">
                     <SelectValue placeholder="Selecione o status" />
@@ -189,20 +221,22 @@ export const OrdersPage = ({ orders, refresh }: OrdersPageProps) => {
                 </Select>
               </div>
               <div className="flex gap-4 pt-4">
-                <Button type="button" variant="outline" onClick={() => { setView('list'); setEditingOrder(null); }} className="flex-1 h-12 font-bold">
-                  Cancelar
+                <Button type="button" variant="outline" onClick={() => { setView('list'); setEditingOrder(null); setViewingOrder(null); }} className="flex-1 h-12 font-bold">
+                  {isDetail ? 'Voltar' : 'Cancelar'}
                 </Button>
-                <Button 
-                  type="submit" 
-                  disabled={isSaving}
-                  className="flex-[2] bg-primary hover:bg-primary/90 h-12 text-base font-bold shadow-lg shadow-primary/20"
-                >
-                  {isSaving ? (
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                  ) : (
-                    editingOrder ? 'Salvar Alterações' : 'Criar Pedido'
-                  )}
-                </Button>
+                {!isDetail && (
+                  <Button 
+                    type="submit" 
+                    disabled={isSaving}
+                    className="flex-[2] bg-primary hover:bg-primary/90 h-12 text-base font-bold shadow-lg shadow-primary/20"
+                  >
+                    {isSaving ? (
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                    ) : (
+                      editingOrder ? 'Salvar Alterações' : 'Criar Pedido'
+                    )}
+                  </Button>
+                )}
               </div>
             </form>
           </CardContent>
@@ -258,15 +292,28 @@ export const OrdersPage = ({ orders, refresh }: OrdersPageProps) => {
               </div>
               <div className="flex gap-2 pt-2">
                 <Button variant="outline" size="sm" className="flex-1" onClick={() => {
-                  setEditingOrder(order);
-                  setView('form');
-                }}>Editar</Button>
-                <Button variant="ghost" size="sm" className="text-red-500 hover:text-red-600 hover:bg-red-50" onClick={() => {
-                  setOrderToDelete(order.id);
-                  setIsDeleteDialogOpen(true);
+                  setViewingOrder(order);
+                  setView('detail');
                 }}>
-                  <Trash2 size={16} />
+                  <Eye size={16} className="mr-1" /> Visualizar
                 </Button>
+                <div className="flex gap-1">
+                  <Button variant="ghost" size="icon" className="text-slate-500 hover:text-primary" onClick={() => {
+                    setEditingOrder(order);
+                    setView('form');
+                  }}>
+                    <Edit2 size={16} />
+                  </Button>
+                  <Button variant="ghost" size="icon" className="text-slate-500 hover:text-primary" onClick={() => handleDuplicate(order)}>
+                    <Copy size={16} />
+                  </Button>
+                  <Button variant="ghost" size="icon" className="text-red-500 hover:text-red-600 hover:bg-red-50" onClick={() => {
+                    setOrderToDelete(order.id);
+                    setIsDeleteDialogOpen(true);
+                  }}>
+                    <Trash2 size={16} />
+                  </Button>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -315,13 +362,22 @@ export const OrdersPage = ({ orders, refresh }: OrdersPageProps) => {
                   <td className="p-4 text-sm font-bold text-slate-900">R$ {order.value.toFixed(2)}</td>
                   <td className="p-4 text-right">
                     <div className="flex justify-end gap-1 transition-opacity">
-                      <Button variant="ghost" size="icon" onClick={() => {
+                      <Button variant="ghost" size="icon" title="Visualizar" onClick={() => {
+                        setViewingOrder(order);
+                        setView('detail');
+                      }}>
+                        <Eye size={16} className="text-slate-400 hover:text-primary" />
+                      </Button>
+                      <Button variant="ghost" size="icon" title="Editar" onClick={() => {
                         setEditingOrder(order);
                         setView('form');
                       }}>
                         <Edit2 size={16} className="text-slate-400 hover:text-primary" />
                       </Button>
-                      <Button variant="ghost" size="icon" onClick={() => {
+                      <Button variant="ghost" size="icon" title="Duplicar" onClick={() => handleDuplicate(order)}>
+                        <Copy size={16} className="text-slate-400 hover:text-primary" />
+                      </Button>
+                      <Button variant="ghost" size="icon" title="Excluir" onClick={() => {
                         setOrderToDelete(order.id);
                         setIsDeleteDialogOpen(true);
                       }}>

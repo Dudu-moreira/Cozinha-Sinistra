@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Plus, Trash2, Edit2, Truck, Phone, Mail, Search, MapPin, ArrowLeft } from 'lucide-react';
+import { Plus, Trash2, Edit2, Truck, Phone, Mail, Search, MapPin, ArrowLeft, Eye, Copy, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { api } from '@/services/api';
 import { useAuth } from '@/AuthContext';
@@ -30,10 +30,12 @@ export const SuppliersPage = ({ suppliers, refresh }: SuppliersPageProps) => {
   const totalPages = Math.ceil(filteredSuppliers.length / itemsPerPage);
   const paginatedSuppliers = filteredSuppliers.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
-  const [view, setView] = useState<'list' | 'form'>('list');
+  const [view, setView] = useState<'list' | 'form' | 'detail'>('list');
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [supplierToDelete, setSupplierToDelete] = useState<string | null>(null);
   const [editingSupplier, setEditingSupplier] = useState<any | null>(null);
+  const [viewingSupplier, setViewingSupplier] = useState<any | null>(null);
   const [formData, setFormData] = useState({
     name: '',
     category: '',
@@ -43,13 +45,14 @@ export const SuppliersPage = ({ suppliers, refresh }: SuppliersPageProps) => {
   });
 
   React.useEffect(() => {
-    if (editingSupplier) {
+    if (editingSupplier || viewingSupplier) {
+      const target = editingSupplier || viewingSupplier;
       setFormData({
-        name: editingSupplier.name,
-        category: editingSupplier.category || '',
-        phone: editingSupplier.phone || '',
-        email: editingSupplier.email || '',
-        address: editingSupplier.address || ''
+        name: target.name,
+        category: target.category || '',
+        phone: target.phone || '',
+        email: target.email || '',
+        address: target.address || ''
       });
     } else {
       setFormData({
@@ -60,12 +63,13 @@ export const SuppliersPage = ({ suppliers, refresh }: SuppliersPageProps) => {
         address: ''
       });
     }
-  }, [editingSupplier, view]);
+  }, [editingSupplier, viewingSupplier, view]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
 
+    setIsSaving(true);
     const data = {
       ...formData,
       userId: user.id
@@ -80,8 +84,32 @@ export const SuppliersPage = ({ suppliers, refresh }: SuppliersPageProps) => {
       setView('list');
       setEditingSupplier(null);
       refresh();
+      alert(editingSupplier ? 'Fornecedor atualizado!' : 'Fornecedor cadastrado com sucesso!');
     } catch (err) {
       console.error("Error saving supplier:", err);
+      alert("Erro ao salvar fornecedor.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleDuplicate = async (supplier: any) => {
+    if (!user) return;
+    try {
+      const data = {
+        name: `${supplier.name} (Cópia)`,
+        category: supplier.category,
+        phone: supplier.phone,
+        email: supplier.email,
+        address: supplier.address,
+        userId: user.id
+      };
+      await api.addSupplier(data);
+      refresh();
+      alert('Fornecedor duplicado com sucesso!');
+    } catch (err) {
+      console.error("Error duplicating supplier:", err);
+      alert("Erro ao duplicar fornecedor.");
     }
   };
 
@@ -97,16 +125,21 @@ export const SuppliersPage = ({ suppliers, refresh }: SuppliersPageProps) => {
     }
   };
 
-  if (view === 'form') {
+  if (view === 'form' || view === 'detail') {
+    const isDetail = view === 'detail';
     return (
       <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => { setView('list'); setEditingSupplier(null); }} className="rounded-full">
+          <Button variant="ghost" size="icon" onClick={() => { setView('list'); setEditingSupplier(null); setViewingSupplier(null); }} className="rounded-full">
             <ArrowLeft size={20} />
           </Button>
           <div>
-            <h2 className="text-2xl font-bold text-slate-900">{editingSupplier ? 'Editar Fornecedor' : 'Novo Fornecedor'}</h2>
-            <p className="text-slate-500 text-sm">Preencha os dados do fornecedor abaixo.</p>
+            <h2 className="text-2xl font-bold text-slate-900">
+              {isDetail ? 'Detalhes do Fornecedor' : (editingSupplier ? 'Editar Fornecedor' : 'Novo Fornecedor')}
+            </h2>
+            <p className="text-slate-500 text-sm">
+              {isDetail ? 'Visualize as informações do fornecedor.' : 'Preencha os dados do fornecedor abaixo.'}
+            </p>
           </div>
         </div>
 
@@ -120,6 +153,7 @@ export const SuppliersPage = ({ suppliers, refresh }: SuppliersPageProps) => {
                   onChange={(e) => setFormData({...formData, name: e.target.value})}
                   placeholder="Ex: Atacadão das Embalagens"
                   required
+                  disabled={isDetail}
                   className="h-12"
                 />
               </div>
@@ -129,6 +163,7 @@ export const SuppliersPage = ({ suppliers, refresh }: SuppliersPageProps) => {
                   value={formData.category || ''} 
                   onChange={(e) => setFormData({...formData, category: e.target.value})}
                   placeholder="Ex: Laticínios, Embalagens, Frutas..."
+                  disabled={isDetail}
                   className="h-12"
                 />
               </div>
@@ -140,6 +175,7 @@ export const SuppliersPage = ({ suppliers, refresh }: SuppliersPageProps) => {
                     value={formData.email || ''} 
                     onChange={(e) => setFormData({...formData, email: e.target.value})}
                     placeholder="contato@fornecedor.com"
+                    disabled={isDetail}
                     className="h-12"
                   />
                 </div>
@@ -149,6 +185,7 @@ export const SuppliersPage = ({ suppliers, refresh }: SuppliersPageProps) => {
                     value={formData.phone || ''} 
                     onChange={(e) => setFormData({...formData, phone: e.target.value})}
                     placeholder="(00) 00000-0000"
+                    disabled={isDetail}
                     className="h-12"
                   />
                 </div>
@@ -159,16 +196,23 @@ export const SuppliersPage = ({ suppliers, refresh }: SuppliersPageProps) => {
                   value={formData.address || ''} 
                   onChange={(e) => setFormData({...formData, address: e.target.value})}
                   placeholder="Rua, Número, Bairro, Cidade"
+                  disabled={isDetail}
                   className="h-12"
                 />
               </div>
               <div className="flex gap-4 pt-4">
-                <Button type="button" variant="outline" onClick={() => { setView('list'); setEditingSupplier(null); }} className="flex-1 h-12 font-bold">
-                  Cancelar
+                <Button type="button" variant="outline" onClick={() => { setView('list'); setEditingSupplier(null); setViewingSupplier(null); }} className="flex-1 h-12 font-bold">
+                  {isDetail ? 'Voltar' : 'Cancelar'}
                 </Button>
-                <Button type="submit" className="flex-[2] bg-primary hover:bg-primary/90 h-12 text-base font-bold shadow-lg shadow-primary/20">
-                  {editingSupplier ? 'Salvar Alterações' : 'Criar Fornecedor'}
-                </Button>
+                {!isDetail && (
+                  <Button 
+                    type="submit" 
+                    disabled={isSaving}
+                    className="flex-[2] bg-primary hover:bg-primary/90 h-12 text-base font-bold shadow-lg shadow-primary/20"
+                  >
+                    {isSaving ? <Loader2 className="w-5 h-5 animate-spin" /> : (editingSupplier ? 'Salvar Alterações' : 'Criar Fornecedor')}
+                  </Button>
+                )}
               </div>
             </form>
           </CardContent>
@@ -218,13 +262,22 @@ export const SuppliersPage = ({ suppliers, refresh }: SuppliersPageProps) => {
                   <Truck size={24} />
                 </div>
                 <div className="flex gap-1 transition-opacity">
-                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => {
+                  <Button variant="ghost" size="icon" className="h-8 w-8" title="Visualizar" onClick={() => {
+                    setViewingSupplier(supplier);
+                    setView('detail');
+                  }}>
+                    <Eye size={14} />
+                  </Button>
+                  <Button variant="ghost" size="icon" className="h-8 w-8" title="Editar" onClick={() => {
                     setEditingSupplier(supplier);
                     setView('form');
                   }}>
                     <Edit2 size={14} />
                   </Button>
-                  <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:text-red-600" onClick={() => {
+                  <Button variant="ghost" size="icon" className="h-8 w-8" title="Duplicar" onClick={() => handleDuplicate(supplier)}>
+                    <Copy size={14} />
+                  </Button>
+                  <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:text-red-600" title="Excluir" onClick={() => {
                     setSupplierToDelete(supplier.id);
                     setIsDeleteDialogOpen(true);
                   }}>

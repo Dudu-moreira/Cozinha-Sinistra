@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Plus, Trash2, Edit2, User, Phone, Mail, Search, MapPin, ArrowLeft } from 'lucide-react';
+import { Plus, Trash2, Edit2, User, Phone, Mail, Search, MapPin, ArrowLeft, Eye, Copy, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { api } from '@/services/api';
 import { useAuth } from '@/AuthContext';
@@ -30,10 +30,12 @@ export const ClientsPage = ({ clients, refresh }: ClientsPageProps) => {
   const totalPages = Math.ceil(filteredClients.length / itemsPerPage);
   const paginatedClients = filteredClients.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
-  const [view, setView] = useState<'list' | 'form'>('list');
+  const [view, setView] = useState<'list' | 'form' | 'detail'>('list');
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [clientToDelete, setClientToDelete] = useState<string | null>(null);
   const [editingClient, setEditingClient] = useState<any | null>(null);
+  const [viewingClient, setViewingClient] = useState<any | null>(null);
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -42,12 +44,13 @@ export const ClientsPage = ({ clients, refresh }: ClientsPageProps) => {
   });
 
   React.useEffect(() => {
-    if (editingClient) {
+    if (editingClient || viewingClient) {
+      const target = editingClient || viewingClient;
       setFormData({
-        name: editingClient.name,
-        email: editingClient.email || '',
-        phone: editingClient.phone || '',
-        address: editingClient.address || ''
+        name: target.name,
+        email: target.email || '',
+        phone: target.phone || '',
+        address: target.address || ''
       });
     } else {
       setFormData({
@@ -57,12 +60,13 @@ export const ClientsPage = ({ clients, refresh }: ClientsPageProps) => {
         address: ''
       });
     }
-  }, [editingClient, view]);
+  }, [editingClient, viewingClient, view]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
 
+    setIsSaving(true);
     const data = {
       ...formData,
       userId: user.id
@@ -77,8 +81,31 @@ export const ClientsPage = ({ clients, refresh }: ClientsPageProps) => {
       setView('list');
       setEditingClient(null);
       refresh();
+      alert(editingClient ? 'Cliente atualizado!' : 'Cliente cadastrado com sucesso!');
     } catch (err) {
       console.error("Error saving client:", err);
+      alert("Erro ao salvar cliente.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleDuplicate = async (client: any) => {
+    if (!user) return;
+    try {
+      const data = {
+        name: `${client.name} (Cópia)`,
+        email: client.email,
+        phone: client.phone,
+        address: client.address,
+        userId: user.id
+      };
+      await api.addClient(data);
+      refresh();
+      alert('Cliente duplicado com sucesso!');
+    } catch (err) {
+      console.error("Error duplicating client:", err);
+      alert("Erro ao duplicar cliente.");
     }
   };
 
@@ -94,16 +121,21 @@ export const ClientsPage = ({ clients, refresh }: ClientsPageProps) => {
     }
   };
 
-  if (view === 'form') {
+  if (view === 'form' || view === 'detail') {
+    const isDetail = view === 'detail';
     return (
       <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => { setView('list'); setEditingClient(null); }} className="rounded-full">
+          <Button variant="ghost" size="icon" onClick={() => { setView('list'); setEditingClient(null); setViewingClient(null); }} className="rounded-full">
             <ArrowLeft size={20} />
           </Button>
           <div>
-            <h2 className="text-2xl font-bold text-slate-900">{editingClient ? 'Editar Cliente' : 'Novo Cliente'}</h2>
-            <p className="text-slate-500 text-sm">Preencha os dados do cliente abaixo.</p>
+            <h2 className="text-2xl font-bold text-slate-900">
+              {isDetail ? 'Detalhes do Cliente' : (editingClient ? 'Editar Cliente' : 'Novo Cliente')}
+            </h2>
+            <p className="text-slate-500 text-sm">
+              {isDetail ? 'Visualize as informações do cliente.' : 'Preencha os dados do cliente abaixo.'}
+            </p>
           </div>
         </div>
 
@@ -117,6 +149,7 @@ export const ClientsPage = ({ clients, refresh }: ClientsPageProps) => {
                   onChange={(e) => setFormData({...formData, name: e.target.value})}
                   placeholder="Ex: Maria Oliveira"
                   required
+                  disabled={isDetail}
                   className="h-12"
                 />
               </div>
@@ -128,6 +161,7 @@ export const ClientsPage = ({ clients, refresh }: ClientsPageProps) => {
                     value={formData.email || ''} 
                     onChange={(e) => setFormData({...formData, email: e.target.value})}
                     placeholder="maria@email.com"
+                    disabled={isDetail}
                     className="h-12"
                   />
                 </div>
@@ -137,6 +171,7 @@ export const ClientsPage = ({ clients, refresh }: ClientsPageProps) => {
                     value={formData.phone || ''} 
                     onChange={(e) => setFormData({...formData, phone: e.target.value})}
                     placeholder="(00) 00000-0000"
+                    disabled={isDetail}
                     className="h-12"
                   />
                 </div>
@@ -147,16 +182,23 @@ export const ClientsPage = ({ clients, refresh }: ClientsPageProps) => {
                   value={formData.address || ''} 
                   onChange={(e) => setFormData({...formData, address: e.target.value})}
                   placeholder="Rua, Número, Bairro, Cidade"
+                  disabled={isDetail}
                   className="h-12"
                 />
               </div>
               <div className="flex gap-4 pt-4">
-                <Button type="button" variant="outline" onClick={() => { setView('list'); setEditingClient(null); }} className="flex-1 h-12 font-bold">
-                  Cancelar
+                <Button type="button" variant="outline" onClick={() => { setView('list'); setEditingClient(null); setViewingClient(null); }} className="flex-1 h-12 font-bold">
+                  {isDetail ? 'Voltar' : 'Cancelar'}
                 </Button>
-                <Button type="submit" className="flex-[2] bg-primary hover:bg-primary/90 h-12 text-base font-bold shadow-lg shadow-primary/20">
-                  {editingClient ? 'Salvar Alterações' : 'Criar Cliente'}
-                </Button>
+                {!isDetail && (
+                  <Button 
+                    type="submit" 
+                    disabled={isSaving}
+                    className="flex-[2] bg-primary hover:bg-primary/90 h-12 text-base font-bold shadow-lg shadow-primary/20"
+                  >
+                    {isSaving ? <Loader2 className="w-5 h-5 animate-spin" /> : (editingClient ? 'Salvar Alterações' : 'Criar Cliente')}
+                  </Button>
+                )}
               </div>
             </form>
           </CardContent>
@@ -206,13 +248,22 @@ export const ClientsPage = ({ clients, refresh }: ClientsPageProps) => {
                   <User size={24} />
                 </div>
                 <div className="flex gap-1 transition-opacity">
-                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => {
+                  <Button variant="ghost" size="icon" className="h-8 w-8" title="Visualizar" onClick={() => {
+                    setViewingClient(client);
+                    setView('detail');
+                  }}>
+                    <Eye size={14} />
+                  </Button>
+                  <Button variant="ghost" size="icon" className="h-8 w-8" title="Editar" onClick={() => {
                     setEditingClient(client);
                     setView('form');
                   }}>
                     <Edit2 size={14} />
                   </Button>
-                  <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:text-red-600" onClick={() => {
+                  <Button variant="ghost" size="icon" className="h-8 w-8" title="Duplicar" onClick={() => handleDuplicate(client)}>
+                    <Copy size={14} />
+                  </Button>
+                  <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:text-red-600" title="Excluir" onClick={() => {
                     setClientToDelete(client.id);
                     setIsDeleteDialogOpen(true);
                   }}>

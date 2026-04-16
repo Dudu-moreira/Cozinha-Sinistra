@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Trash2, TrendingUp, TrendingDown, DollarSign, Calendar as CalendarIcon, Filter, Download, ArrowLeft } from 'lucide-react';
+import { Plus, Trash2, TrendingUp, TrendingDown, DollarSign, Calendar as CalendarIcon, Filter, Download, ArrowLeft, Eye, Copy, Loader2, Edit2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Transaction } from '@/types';
 import { api } from '@/services/api';
@@ -32,9 +32,12 @@ export const FinancePage = ({ transactions, refresh }: FinancePageProps) => {
   const totalPages = Math.ceil(transactions.length / itemsPerPage);
   const paginatedTransactions = transactions.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
-  const [view, setView] = useState<'list' | 'form'>('list');
+  const [view, setView] = useState<'list' | 'form' | 'detail'>('list');
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [transactionToDelete, setTransactionToDelete] = useState<string | null>(null);
+  const [editingTransaction, setEditingTransaction] = useState<any | null>(null);
+  const [viewingTransaction, setViewingTransaction] = useState<any | null>(null);
   const [formData, setFormData] = useState({
     description: '',
     amount: '',
@@ -43,10 +46,32 @@ export const FinancePage = ({ transactions, refresh }: FinancePageProps) => {
     date: new Date().toISOString().split('T')[0]
   });
 
+  React.useEffect(() => {
+    if (editingTransaction || viewingTransaction) {
+      const target = editingTransaction || viewingTransaction;
+      setFormData({
+        description: target.description,
+        amount: target.amount.toString(),
+        type: target.type,
+        category: target.category,
+        date: new Date(target.date).toISOString().split('T')[0]
+      });
+    } else {
+      setFormData({
+        description: '',
+        amount: '',
+        type: 'Entrada',
+        category: 'Vendas',
+        date: new Date().toISOString().split('T')[0]
+      });
+    }
+  }, [editingTransaction, viewingTransaction, view]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
 
+    setIsSaving(true);
     const data = {
       description: formData.description,
       amount: parseFloat(formData.amount),
@@ -57,8 +82,14 @@ export const FinancePage = ({ transactions, refresh }: FinancePageProps) => {
     };
 
     try {
-      await api.addTransaction(data);
+      if (editingTransaction) {
+        await api.updateTransaction(editingTransaction.id, data);
+      } else {
+        await api.addTransaction(data);
+      }
       setView('list');
+      setEditingTransaction(null);
+      setViewingTransaction(null);
       setFormData({
         description: '',
         amount: '',
@@ -67,8 +98,32 @@ export const FinancePage = ({ transactions, refresh }: FinancePageProps) => {
         date: new Date().toISOString().split('T')[0]
       });
       refresh();
+      alert(editingTransaction ? 'Transação atualizada!' : 'Transação registrada com sucesso!');
     } catch (err) {
       console.error("Error saving transaction:", err);
+      alert("Erro ao salvar transação.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleDuplicate = async (transaction: any) => {
+    if (!user) return;
+    try {
+      const data = {
+        description: `${transaction.description} (Cópia)`,
+        amount: transaction.amount,
+        type: transaction.type,
+        category: transaction.category,
+        date: new Date().toISOString(),
+        userId: user.id
+      };
+      await api.addTransaction(data);
+      refresh();
+      alert('Transação duplicada com sucesso!');
+    } catch (err) {
+      console.error("Error duplicating transaction:", err);
+      alert("Erro ao duplicar transação.");
     }
   };
 
@@ -84,16 +139,21 @@ export const FinancePage = ({ transactions, refresh }: FinancePageProps) => {
     }
   };
 
-  if (view === 'form') {
+  if (view === 'form' || view === 'detail') {
+    const isDetail = view === 'detail';
     return (
       <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => { setView('list'); }} className="rounded-full">
+          <Button variant="ghost" size="icon" onClick={() => { setView('list'); setEditingTransaction(null); setViewingTransaction(null); }} className="rounded-full">
             <ArrowLeft size={20} />
           </Button>
           <div>
-            <h2 className="text-2xl font-bold text-slate-900">Nova Transação</h2>
-            <p className="text-slate-500 text-sm">Registre uma nova entrada ou saída financeira.</p>
+            <h2 className="text-2xl font-bold text-slate-900">
+              {isDetail ? 'Detalhes da Transação' : (editingTransaction ? 'Editar Transação' : 'Nova Transação')}
+            </h2>
+            <p className="text-slate-500 text-sm">
+              {isDetail ? 'Visualize as informações da transação.' : 'Registre uma nova entrada ou saída financeira.'}
+            </p>
           </div>
         </div>
 
@@ -107,6 +167,7 @@ export const FinancePage = ({ transactions, refresh }: FinancePageProps) => {
                   onChange={(e) => setFormData({...formData, description: e.target.value})}
                   placeholder="Ex: Venda Bolo de Chocolate"
                   required
+                  disabled={isDetail}
                   className="h-12"
                 />
               </div>
@@ -120,6 +181,7 @@ export const FinancePage = ({ transactions, refresh }: FinancePageProps) => {
                     onChange={(e) => setFormData({...formData, amount: e.target.value})}
                     placeholder="0.00"
                     required
+                    disabled={isDetail}
                     className="h-12"
                   />
                 </div>
@@ -128,6 +190,7 @@ export const FinancePage = ({ transactions, refresh }: FinancePageProps) => {
                   <Select 
                     value={formData.type || ''} 
                     onValueChange={(val: any) => setFormData({...formData, type: val})}
+                    disabled={isDetail}
                   >
                     <SelectTrigger className="h-12">
                       <SelectValue />
@@ -145,6 +208,7 @@ export const FinancePage = ({ transactions, refresh }: FinancePageProps) => {
                   <Select 
                     value={formData.category || ''} 
                     onValueChange={(val) => setFormData({...formData, category: val})}
+                    disabled={isDetail}
                   >
                     <SelectTrigger className="h-12">
                       <SelectValue />
@@ -165,17 +229,24 @@ export const FinancePage = ({ transactions, refresh }: FinancePageProps) => {
                     value={formData.date || ''} 
                     onChange={(e) => setFormData({...formData, date: e.target.value})}
                     required
+                    disabled={isDetail}
                     className="h-12"
                   />
                 </div>
               </div>
               <div className="flex gap-4 pt-4">
-                <Button type="button" variant="outline" onClick={() => { setView('list'); }} className="flex-1 h-12 font-bold">
-                  Cancelar
+                <Button type="button" variant="outline" onClick={() => { setView('list'); setEditingTransaction(null); setViewingTransaction(null); }} className="flex-1 h-12 font-bold">
+                  {isDetail ? 'Voltar' : 'Cancelar'}
                 </Button>
-                <Button type="submit" className="flex-[2] bg-primary hover:bg-primary/90 h-12 text-base font-bold shadow-lg shadow-primary/20">
-                  Lançar Transação
-                </Button>
+                {!isDetail && (
+                  <Button 
+                    type="submit" 
+                    disabled={isSaving}
+                    className="flex-[2] bg-primary hover:bg-primary/90 h-12 text-base font-bold shadow-lg shadow-primary/20"
+                  >
+                    {isSaving ? <Loader2 className="w-5 h-5 animate-spin" /> : (editingTransaction ? 'Salvar Alterações' : 'Lançar Transação')}
+                  </Button>
+                )}
               </div>
             </form>
           </CardContent>
@@ -290,12 +361,29 @@ export const FinancePage = ({ transactions, refresh }: FinancePageProps) => {
                       {t.type === 'Entrada' ? '+' : '-'} R$ {t.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                     </td>
                     <td className="p-4 text-right">
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-red-600 transition-opacity" onClick={() => {
-                        setTransactionToDelete(t.id);
-                        setIsDeleteDialogOpen(true);
-                      }}>
-                        <Trash2 size={14} />
-                      </Button>
+                      <div className="flex justify-end gap-1">
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400" title="Visualizar" onClick={() => {
+                          setViewingTransaction(t);
+                          setView('detail');
+                        }}>
+                          <Eye size={14} />
+                        </Button>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400" title="Editar" onClick={() => {
+                          setEditingTransaction(t);
+                          setView('form');
+                        }}>
+                          <Edit2 size={14} />
+                        </Button>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400" title="Duplicar" onClick={() => handleDuplicate(t)}>
+                          <Copy size={14} />
+                        </Button>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-red-600 transition-opacity" title="Excluir" onClick={() => {
+                          setTransactionToDelete(t.id);
+                          setIsDeleteDialogOpen(true);
+                        }}>
+                          <Trash2 size={14} />
+                        </Button>
+                      </div>
                     </td>
                   </tr>
                 ))}

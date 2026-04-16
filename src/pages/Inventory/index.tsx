@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Plus, Trash2, Edit2, Package, AlertTriangle, Search, ArrowLeft } from 'lucide-react';
+import { Plus, Trash2, Edit2, Package, AlertTriangle, Search, ArrowLeft, Eye, Copy, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Ingredient } from '@/types';
 import { api } from '@/services/api';
@@ -30,10 +30,12 @@ export const InventoryPage = ({ ingredients, refresh }: InventoryPageProps) => {
   const totalPages = Math.ceil(filteredIngredients.length / itemsPerPage);
   const paginatedIngredients = filteredIngredients.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
-  const [view, setView] = useState<'list' | 'form'>('list');
+  const [view, setView] = useState<'list' | 'form' | 'detail'>('list');
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [ingredientToDelete, setIngredientToDelete] = useState<string | null>(null);
   const [editingIngredient, setEditingIngredient] = useState<Ingredient | null>(null);
+  const [viewingIngredient, setViewingIngredient] = useState<Ingredient | null>(null);
   const [formData, setFormData] = useState({
     name: '',
     quantity: '',
@@ -42,12 +44,13 @@ export const InventoryPage = ({ ingredients, refresh }: InventoryPageProps) => {
   });
 
   React.useEffect(() => {
-    if (editingIngredient) {
+    if (editingIngredient || viewingIngredient) {
+      const target = editingIngredient || viewingIngredient;
       setFormData({
-        name: editingIngredient.name,
-        quantity: editingIngredient.quantity.toString(),
-        unit: editingIngredient.unit,
-        minQuantity: editingIngredient.minQuantity.toString()
+        name: target.name,
+        quantity: target.quantity.toString(),
+        unit: target.unit,
+        minQuantity: target.minQuantity.toString()
       });
     } else {
       setFormData({
@@ -57,12 +60,13 @@ export const InventoryPage = ({ ingredients, refresh }: InventoryPageProps) => {
         minQuantity: ''
       });
     }
-  }, [editingIngredient, view]);
+  }, [editingIngredient, viewingIngredient, view]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
 
+    setIsSaving(true);
     const data = {
       name: formData.name,
       quantity: parseFloat(formData.quantity),
@@ -80,8 +84,31 @@ export const InventoryPage = ({ ingredients, refresh }: InventoryPageProps) => {
       setView('list');
       setEditingIngredient(null);
       refresh();
+      alert(editingIngredient ? 'Insumo atualizado!' : 'Insumo cadastrado com sucesso!');
     } catch (err) {
       console.error("Error saving ingredient:", err);
+      alert("Erro ao salvar insumo.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleDuplicate = async (ing: Ingredient) => {
+    if (!user) return;
+    try {
+      const data = {
+        name: `${ing.name} (Cópia)`,
+        quantity: ing.quantity,
+        unit: ing.unit,
+        minQuantity: ing.minQuantity,
+        userId: user.id
+      };
+      await api.addIngredient(data);
+      refresh();
+      alert('Insumo duplicado com sucesso!');
+    } catch (err) {
+      console.error("Error duplicating ingredient:", err);
+      alert("Erro ao duplicar insumo.");
     }
   };
 
@@ -97,16 +124,21 @@ export const InventoryPage = ({ ingredients, refresh }: InventoryPageProps) => {
     }
   };
 
-  if (view === 'form') {
+  if (view === 'form' || view === 'detail') {
+    const isDetail = view === 'detail';
     return (
       <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => { setView('list'); setEditingIngredient(null); }} className="rounded-full">
+          <Button variant="ghost" size="icon" onClick={() => { setView('list'); setEditingIngredient(null); setViewingIngredient(null); }} className="rounded-full">
             <ArrowLeft size={20} />
           </Button>
           <div>
-            <h2 className="text-2xl font-bold text-slate-900">{editingIngredient ? 'Editar Insumo' : 'Novo Insumo'}</h2>
-            <p className="text-slate-500 text-sm">Preencha os dados do insumo abaixo.</p>
+            <h2 className="text-2xl font-bold text-slate-900">
+              {isDetail ? 'Detalhes do Insumo' : (editingIngredient ? 'Editar Insumo' : 'Novo Insumo')}
+            </h2>
+            <p className="text-slate-500 text-sm">
+              {isDetail ? 'Visualize as informações do insumo.' : 'Preencha os dados do insumo abaixo.'}
+            </p>
           </div>
         </div>
 
@@ -120,6 +152,7 @@ export const InventoryPage = ({ ingredients, refresh }: InventoryPageProps) => {
                   onChange={(e) => setFormData({...formData, name: e.target.value})}
                   placeholder="Ex: Farinha de Trigo"
                   required
+                  disabled={isDetail}
                   className="h-12"
                 />
               </div>
@@ -133,6 +166,7 @@ export const InventoryPage = ({ ingredients, refresh }: InventoryPageProps) => {
                     onChange={(e) => setFormData({...formData, quantity: e.target.value})}
                     placeholder="0.00"
                     required
+                    disabled={isDetail}
                     className="h-12"
                   />
                 </div>
@@ -143,6 +177,7 @@ export const InventoryPage = ({ ingredients, refresh }: InventoryPageProps) => {
                     onChange={(e) => setFormData({...formData, unit: e.target.value})}
                     placeholder="kg, un, ml..."
                     required
+                    disabled={isDetail}
                     className="h-12"
                   />
                 </div>
@@ -156,16 +191,23 @@ export const InventoryPage = ({ ingredients, refresh }: InventoryPageProps) => {
                   onChange={(e) => setFormData({...formData, minQuantity: e.target.value})}
                   placeholder="0.00"
                   required
+                  disabled={isDetail}
                   className="h-12"
                 />
               </div>
               <div className="flex gap-4 pt-4">
-                <Button type="button" variant="outline" onClick={() => { setView('list'); setEditingIngredient(null); }} className="flex-1 h-12 font-bold">
-                  Cancelar
+                <Button type="button" variant="outline" onClick={() => { setView('list'); setEditingIngredient(null); setViewingIngredient(null); }} className="flex-1 h-12 font-bold">
+                  {isDetail ? 'Voltar' : 'Cancelar'}
                 </Button>
-                <Button type="submit" className="flex-[2] bg-primary hover:bg-primary/90 h-12 text-base font-bold shadow-lg shadow-primary/20">
-                  {editingIngredient ? 'Salvar Alterações' : 'Criar Insumo'}
-                </Button>
+                {!isDetail && (
+                  <Button 
+                    type="submit" 
+                    disabled={isSaving}
+                    className="flex-[2] bg-primary hover:bg-primary/90 h-12 text-base font-bold shadow-lg shadow-primary/20"
+                  >
+                    {isSaving ? <Loader2 className="w-5 h-5 animate-spin" /> : (editingIngredient ? 'Salvar Alterações' : 'Criar Insumo')}
+                  </Button>
+                )}
               </div>
             </form>
           </CardContent>
@@ -223,13 +265,22 @@ export const InventoryPage = ({ ingredients, refresh }: InventoryPageProps) => {
                     <Package size={20} />
                   </div>
                   <div className="flex gap-1 transition-opacity">
-                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => {
+                    <Button variant="ghost" size="icon" className="h-8 w-8" title="Visualizar" onClick={() => {
+                      setViewingIngredient(ing);
+                      setView('detail');
+                    }}>
+                      <Eye size={14} />
+                    </Button>
+                    <Button variant="ghost" size="icon" className="h-8 w-8" title="Editar" onClick={() => {
                       setEditingIngredient(ing);
                       setView('form');
                     }}>
                       <Edit2 size={14} />
                     </Button>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:text-red-600" onClick={() => {
+                    <Button variant="ghost" size="icon" className="h-8 w-8" title="Duplicar" onClick={() => handleDuplicate(ing)}>
+                      <Copy size={14} />
+                    </Button>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:text-red-600" title="Excluir" onClick={() => {
                       setIngredientToDelete(ing.id);
                       setIsDeleteDialogOpen(true);
                     }}>

@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Plus, Trash2, Edit2, BookOpen, Calculator, Search, ChevronRight, ArrowLeft } from 'lucide-react';
+import { Plus, Trash2, Edit2, BookOpen, Calculator, Search, ChevronRight, ArrowLeft, Eye, Copy, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { api } from '@/services/api';
 import { useAuth } from '@/AuthContext';
@@ -29,10 +29,12 @@ export const RecipesPage = ({ recipes, refresh }: RecipesPageProps) => {
   const totalPages = Math.ceil(filteredRecipes.length / itemsPerPage);
   const paginatedRecipes = filteredRecipes.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
-  const [view, setView] = useState<'list' | 'form'>('list');
+  const [view, setView] = useState<'list' | 'form' | 'detail'>('list');
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [recipeToDelete, setRecipeToDelete] = useState<string | null>(null);
   const [editingRecipe, setEditingRecipe] = useState<any | null>(null);
+  const [viewingRecipe, setViewingRecipe] = useState<any | null>(null);
   const [formData, setFormData] = useState({
     name: '',
     yield: '',
@@ -41,12 +43,13 @@ export const RecipesPage = ({ recipes, refresh }: RecipesPageProps) => {
   });
 
   useEffect(() => {
-    if (editingRecipe) {
+    if (editingRecipe || viewingRecipe) {
+      const target = editingRecipe || viewingRecipe;
       setFormData({
-        name: editingRecipe.name,
-        yield: editingRecipe.yield.toString(),
-        cost: editingRecipe.cost.toString(),
-        ingredients: editingRecipe.ingredients || []
+        name: target.name,
+        yield: target.yield.toString(),
+        cost: target.cost.toString(),
+        ingredients: target.ingredients || []
       });
     } else {
       setFormData({
@@ -56,12 +59,13 @@ export const RecipesPage = ({ recipes, refresh }: RecipesPageProps) => {
         ingredients: []
       });
     }
-  }, [editingRecipe, view]);
+  }, [editingRecipe, viewingRecipe, view]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
 
+    setIsSaving(true);
     const data = {
       name: formData.name,
       yield: parseFloat(formData.yield),
@@ -79,8 +83,31 @@ export const RecipesPage = ({ recipes, refresh }: RecipesPageProps) => {
       setView('list');
       setEditingRecipe(null);
       refresh();
+      alert(editingRecipe ? 'Receita atualizada!' : 'Receita cadastrada com sucesso!');
     } catch (err) {
       console.error("Error saving recipe:", err);
+      alert("Erro ao salvar receita.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleDuplicate = async (recipe: any) => {
+    if (!user) return;
+    try {
+      const data = {
+        name: `${recipe.name} (Cópia)`,
+        yield: recipe.yield,
+        cost: recipe.cost,
+        ingredients: recipe.ingredients,
+        userId: user.id
+      };
+      await api.addRecipe(data);
+      refresh();
+      alert('Receita duplicada com sucesso!');
+    } catch (err) {
+      console.error("Error duplicating recipe:", err);
+      alert("Erro ao duplicar receita.");
     }
   };
 
@@ -96,16 +123,21 @@ export const RecipesPage = ({ recipes, refresh }: RecipesPageProps) => {
     }
   };
 
-  if (view === 'form') {
+  if (view === 'form' || view === 'detail') {
+    const isDetail = view === 'detail';
     return (
       <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => { setView('list'); setEditingRecipe(null); }} className="rounded-full">
+          <Button variant="ghost" size="icon" onClick={() => { setView('list'); setEditingRecipe(null); setViewingRecipe(null); }} className="rounded-full">
             <ArrowLeft size={20} />
           </Button>
           <div>
-            <h2 className="text-2xl font-bold text-slate-900">{editingRecipe ? 'Editar Receita' : 'Nova Receita'}</h2>
-            <p className="text-slate-500 text-sm">Preencha os detalhes da receita abaixo.</p>
+            <h2 className="text-2xl font-bold text-slate-900">
+              {isDetail ? 'Detalhes da Receita' : (editingRecipe ? 'Editar Receita' : 'Nova Receita')}
+            </h2>
+            <p className="text-slate-500 text-sm">
+              {isDetail ? 'Visualize as informações da receita.' : 'Preencha os detalhes da receita abaixo.'}
+            </p>
           </div>
         </div>
 
@@ -119,6 +151,7 @@ export const RecipesPage = ({ recipes, refresh }: RecipesPageProps) => {
                   onChange={(e) => setFormData({...formData, name: e.target.value})}
                   placeholder="Ex: Bolo de Cenoura com Brigadeiro"
                   required
+                  disabled={isDetail}
                   className="h-12"
                 />
               </div>
@@ -131,6 +164,7 @@ export const RecipesPage = ({ recipes, refresh }: RecipesPageProps) => {
                     onChange={(e) => setFormData({...formData, yield: e.target.value})}
                     placeholder="12"
                     required
+                    disabled={isDetail}
                     className="h-12"
                   />
                 </div>
@@ -143,6 +177,7 @@ export const RecipesPage = ({ recipes, refresh }: RecipesPageProps) => {
                     onChange={(e) => setFormData({...formData, cost: e.target.value})}
                     placeholder="0.00"
                     required
+                    disabled={isDetail}
                     className="h-12"
                   />
                 </div>
@@ -155,12 +190,18 @@ export const RecipesPage = ({ recipes, refresh }: RecipesPageProps) => {
                 </div>
               </div>
               <div className="flex gap-4 pt-4">
-                <Button type="button" variant="outline" onClick={() => { setView('list'); setEditingRecipe(null); }} className="flex-1 h-12 font-bold">
-                  Cancelar
+                <Button type="button" variant="outline" onClick={() => { setView('list'); setEditingRecipe(null); setViewingRecipe(null); }} className="flex-1 h-12 font-bold">
+                  {isDetail ? 'Voltar' : 'Cancelar'}
                 </Button>
-                <Button type="submit" className="flex-[2] bg-primary hover:bg-primary/90 h-12 text-base font-bold shadow-lg shadow-primary/20">
-                  {editingRecipe ? 'Salvar Alterações' : 'Criar Receita'}
-                </Button>
+                {!isDetail && (
+                  <Button 
+                    type="submit" 
+                    disabled={isSaving}
+                    className="flex-[2] bg-primary hover:bg-primary/90 h-12 text-base font-bold shadow-lg shadow-primary/20"
+                  >
+                    {isSaving ? <Loader2 className="w-5 h-5 animate-spin" /> : (editingRecipe ? 'Salvar Alterações' : 'Criar Receita')}
+                  </Button>
+                )}
               </div>
             </form>
           </CardContent>
@@ -211,13 +252,22 @@ export const RecipesPage = ({ recipes, refresh }: RecipesPageProps) => {
                   <BookOpen size={24} />
                 </div>
                 <div className="flex gap-1 transition-opacity">
-                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => {
+                  <Button variant="ghost" size="icon" className="h-8 w-8" title="Visualizar" onClick={() => {
+                    setViewingRecipe(recipe);
+                    setView('detail');
+                  }}>
+                    <Eye size={14} />
+                  </Button>
+                  <Button variant="ghost" size="icon" className="h-8 w-8" title="Editar" onClick={() => {
                     setEditingRecipe(recipe);
                     setView('form');
                   }}>
                     <Edit2 size={14} />
                   </Button>
-                  <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:text-red-600" onClick={() => {
+                  <Button variant="ghost" size="icon" className="h-8 w-8" title="Duplicar" onClick={() => handleDuplicate(recipe)}>
+                    <Copy size={14} />
+                  </Button>
+                  <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:text-red-600" title="Excluir" onClick={() => {
                     setRecipeToDelete(recipe.id);
                     setIsDeleteDialogOpen(true);
                   }}>
