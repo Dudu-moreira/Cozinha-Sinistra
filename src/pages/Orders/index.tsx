@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Trash2, Edit2, Search, ArrowLeft } from 'lucide-react';
+import { Plus, Trash2, Edit2, Search, ArrowLeft, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Order, OrderStatus } from '@/types';
 import { api } from '@/services/api';
@@ -25,6 +25,7 @@ export const OrdersPage = ({ orders, refresh }: OrdersPageProps) => {
   
   const [view, setView] = useState<'list' | 'form'>('list');
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [editingOrder, setEditingOrder] = useState<Order | null>(null);
   const [orderToDelete, setOrderToDelete] = useState<string | null>(null);
   const [formData, setFormData] = useState({
@@ -62,9 +63,16 @@ export const OrdersPage = ({ orders, refresh }: OrdersPageProps) => {
     e.preventDefault();
     if (!user) return;
 
+    const val = parseFloat(formData.value);
+    if (isNaN(val)) {
+      alert("Por favor, insira um valor válido.");
+      return;
+    }
+
+    setIsSaving(true);
     const data = {
       ...formData,
-      value: parseFloat(formData.value),
+      value: val,
       userId: user.id
     };
 
@@ -77,8 +85,12 @@ export const OrdersPage = ({ orders, refresh }: OrdersPageProps) => {
       setView('list');
       setEditingOrder(null);
       refresh();
+      alert(editingOrder ? 'Pedido atualizado!' : 'Pedido criado com sucesso!');
     } catch (err) {
       console.error("Error saving order:", err);
+      alert("Erro ao salvar pedido. Verifique os dados e tente novamente.");
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -180,8 +192,16 @@ export const OrdersPage = ({ orders, refresh }: OrdersPageProps) => {
                 <Button type="button" variant="outline" onClick={() => { setView('list'); setEditingOrder(null); }} className="flex-1 h-12 font-bold">
                   Cancelar
                 </Button>
-                <Button type="submit" className="flex-[2] bg-primary hover:bg-primary/90 h-12 text-base font-bold shadow-lg shadow-primary/20">
-                  {editingOrder ? 'Salvar Alterações' : 'Criar Pedido'}
+                <Button 
+                  type="submit" 
+                  disabled={isSaving}
+                  className="flex-[2] bg-primary hover:bg-primary/90 h-12 text-base font-bold shadow-lg shadow-primary/20"
+                >
+                  {isSaving ? (
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                  ) : (
+                    editingOrder ? 'Salvar Alterações' : 'Criar Pedido'
+                  )}
                 </Button>
               </div>
             </form>
@@ -251,6 +271,11 @@ export const OrdersPage = ({ orders, refresh }: OrdersPageProps) => {
             </CardContent>
           </Card>
         ))}
+        {orders.length === 0 && (
+          <div className="col-span-full p-8 text-center text-slate-400 bg-white rounded-xl shadow-sm">
+            Nenhum pedido cadastrado
+          </div>
+        )}
       </div>
 
       {/* Desktop View */}
